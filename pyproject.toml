@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "reisekosten"
+version = "0.1.0"
+description = "Expense report automation — Kreditkartenabrechnung & Reisekostenabrechnung"
+authors = ["Maximilian Naumow"]
+packages = [{include = "backend"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115"
+uvicorn = {extras = ["standard"], version = "^0.32"}
+pydantic = "^2.9"
+pydantic-settings = "^2.6"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0"}
+aiosqlite = "^0.20"
+pdfplumber = "^0.11"
+pypdf = "^5.0"
+pdf2image = "^1.17"
+openai = "^1.50"
+python-multipart = "^0.0.18"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

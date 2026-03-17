@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Data (SQLite + uploaded PDFs — not committed)
+data/
+
+# Env
+.env
+
+# macOS
+.DS_Store
