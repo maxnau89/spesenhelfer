@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/reisekosten.db"
     upload_dir: str = "./data/uploads"
     openai_api_key: str = ""
+    jwt_secret_key: str = ""
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://localhost:4173",

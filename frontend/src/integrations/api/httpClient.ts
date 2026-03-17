@@ -1,4 +1,5 @@
 const BASE = import.meta.env.VITE_API_BASE_URL || "";
+const TOKEN_KEY = "wsai_auth_token";
 
 export interface RequestOptions {
   method?: string;
@@ -9,21 +10,31 @@ export interface RequestOptions {
 async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, headers = {} } = options;
 
-  const init: RequestInit = {
-    method,
-    headers: { "Content-Type": "application/json", ...headers },
+  const token = localStorage.getItem(TOKEN_KEY);
+  const reqHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...headers,
   };
+  if (token) reqHeaders["Authorization"] = `Bearer ${token}`;
+
+  const init: RequestInit = { method, headers: reqHeaders };
 
   if (body !== undefined) {
     if (body instanceof FormData) {
       init.body = body;
-      delete (init.headers as Record<string, string>)["Content-Type"];
+      delete reqHeaders["Content-Type"];
+      init.headers = reqHeaders;
     } else {
       init.body = JSON.stringify(body);
     }
   }
 
   const res = await fetch(`${BASE}${url}`, init);
+  if (res.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.href = "/login";
+    throw new Error("Session abgelaufen");
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status} ${res.statusText}: ${text}`);

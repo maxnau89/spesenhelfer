@@ -11,6 +11,8 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8011
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Must match JWT_SECRET_KEY from wsai docker-compose to accept its tokens
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     ports:
       - "127.0.0.1:8011:8011"
     volumes:

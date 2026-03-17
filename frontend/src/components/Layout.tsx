@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getReports, createReport } from "@/integrations/api/api";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Report } from "@/integrations/api/types";
 
 const MONTHS_DE = [
@@ -18,6 +19,7 @@ interface LayoutProps {
 export function Layout({ children, reportId, onReportChange }: LayoutProps) {
   const location = useLocation();
   const [creating, setCreating] = useState(false);
+  const { email, logout } = useAuth();
 
   const { data: reports = [], refetch } = useQuery({
     queryKey: ["reports"],
@@ -94,6 +96,17 @@ export function Layout({ children, reportId, onReportChange }: LayoutProps) {
             className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md text-left transition-colors"
           >
             {creating ? "..." : "+ Neuer Bericht"}
+          </button>
+        </div>
+
+        {/* User / logout */}
+        <div className="mt-auto pt-4 border-t border-border">
+          <p className="text-xs text-muted-foreground truncate px-1 mb-2">{email}</p>
+          <button
+            onClick={logout}
+            className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+          >
+            Abmelden
           </button>
         </div>
       </aside>
