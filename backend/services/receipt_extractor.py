@@ -369,30 +369,22 @@ def _extract_vision_llm(file_path: str, filename: str, openai_api_key: str) -> E
 def extract_receipt(file_path: str, filename: str, openai_api_key: str = "") -> ExtractedReceipt:
     """
     Hybrid extraction:
-    1. Try pdfplumber (fast, free, works for digital PDFs)
-    2. Fall back to GPT-4o vision if text layer is absent or confidence < 0.4
+    1. GPT-4o vision (primary when API key available) — handles complex layouts like DB tickets
+    2. pdfplumber fallback — fast regex extraction for simple digital invoices
     """
-    import pdfplumber
+    if openai_api_key:
+        vision_result = _extract_vision_llm(file_path, filename, openai_api_key)
+        if vision_result.extraction_confidence >= 0.4:
+            return vision_result
 
-    # Quick check: does this PDF have a text layer?
+    # pdfplumber fallback (no API key, or vision returned low confidence)
+    import pdfplumber
     full_text = ""
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
             full_text += page.extract_text() or ""
-        text_length = len(full_text.strip())
 
-    if text_length >= 50:
-        result = _extract_pdfplumber(file_path, filename)
-        if result.extraction_confidence >= 0.4:
-            return result
-        # Partial extraction — try vision if key available
-        if openai_api_key:
-            vision_result = _extract_vision_llm(file_path, filename, openai_api_key)
-            if vision_result.extraction_confidence >= result.extraction_confidence:
-                return vision_result
-        return result
-    elif openai_api_key:
-        return _extract_vision_llm(file_path, filename, openai_api_key)
-    else:
-        # No text layer, no API key — return empty extraction
-        return ExtractedReceipt(None, None, None, Path(filename).stem or None, 0.0, "pdfplumber", "")
+    if len(full_text.strip()) >= 50:
+        return _extract_pdfplumber(file_path, filename)
+
+    return ExtractedReceipt(None, None, None, Path(filename).stem or None, 0.0, "pdfplumber", "")
