@@ -97,6 +97,37 @@ def match_receipts(
     Pass 1: single receipt match.
     Pass 2: split receipt match for remaining transactions (two receipts summing to tx amount).
     """
+    # ── Pre-pass: reserve receipt pairs that sum to a transaction amount ─────────
+    # Prevents greedy Pass 1 from consuming one half of a split pair
+    # (e.g. DB Hin+Rückfahrt: two 40€ receipts for one 80€ transaction).
+    split_reserved: set[str] = set()
+    for tx in transactions:
+        if not tx.get("needs_receipt", True):
+            continue
+        tx_abs = abs(tx["amount"])
+        # Skip if a single receipt already matches this tx well
+        best_single = max(
+            (0.4 * _date_score(tx["booking_date"], rx.get("extracted_date")) +
+             0.6 * _amount_score(tx["amount"], rx.get("extracted_amount"), rx.get("extracted_currency")))
+            for rx in receipts
+        ) if receipts else 0.0
+        if best_single >= 0.8:
+            continue
+        # Reserve pairs whose EUR-sum matches this tx within tolerance
+        for i, rx1 in enumerate(receipts):
+            a1 = rx1.get("extracted_amount")
+            if a1 is None:
+                continue
+            a1_eur = abs(_to_eur(a1, rx1.get("extracted_currency")))
+            for rx2 in receipts[i + 1:]:
+                a2 = rx2.get("extracted_amount")
+                if a2 is None:
+                    continue
+                a2_eur = abs(_to_eur(a2, rx2.get("extracted_currency")))
+                if abs(a1_eur + a2_eur - tx_abs) <= 0.10:
+                    split_reserved.add(rx1["id"])
+                    split_reserved.add(rx2["id"])
+
     # ── Pass 1: single receipt ──────────────────────────────────────────────────
     candidates: list[tuple[float, str, str]] = []
 
@@ -104,6 +135,8 @@ def match_receipts(
         if not tx.get("needs_receipt", True):
             continue
         for rx in receipts:
+            if rx["id"] in split_reserved:
+                continue  # reserved for split pairing — skip in Pass 1
             ds = _date_score(tx["booking_date"], rx.get("extracted_date"))
             as_ = _amount_score(tx["amount"], rx.get("extracted_amount"), rx.get("extracted_currency"))
             score = 0.4 * ds + 0.6 * as_

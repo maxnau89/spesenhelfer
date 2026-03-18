@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.auth import CurrentUser, get_current_user
+from backend.auth import CurrentUser
 from backend.database import get_db
 from backend.models import Match, MonthlyReport, Receipt, Transaction
 from backend.schemas import MatchCreate, MatchOut, MatchUpdate
@@ -15,7 +15,7 @@ router = APIRouter(tags=["Matches"])
 
 
 @router.post("/api/v1/reports/{report_id}/match", response_model=list[MatchOut])
-async def run_auto_match(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def run_auto_match(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     """Run auto-matching algorithm. Deletes previous auto matches, keeps manual/acknowledged ones."""
     await _get_report_or_404(report_id, user.email, db)
 
@@ -88,7 +88,7 @@ async def run_auto_match(report_id: str, user: CurrentUser = Depends(get_current
 
 
 @router.get("/api/v1/reports/{report_id}/matches", response_model=list[MatchOut])
-async def list_matches(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def list_matches(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     await _get_report_or_404(report_id, user.email, db)
     tx_result = await db.execute(select(Transaction.id).where(Transaction.report_id == report_id))
     tx_ids = [row[0] for row in tx_result.all()]
@@ -97,7 +97,7 @@ async def list_matches(report_id: str, user: CurrentUser = Depends(get_current_u
 
 
 @router.post("/api/v1/matches", response_model=MatchOut, status_code=201)
-async def create_match(body: MatchCreate, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_match(body: MatchCreate, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     # Remove existing match for this transaction
     existing = await db.execute(select(Match).where(Match.transaction_id == body.transaction_id))
     old = existing.scalar_one_or_none()
@@ -120,7 +120,7 @@ async def create_match(body: MatchCreate, user: CurrentUser = Depends(get_curren
 
 
 @router.patch("/api/v1/matches/{match_id}", response_model=MatchOut)
-async def update_match(match_id: str, body: MatchUpdate, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_match(match_id: str, body: MatchUpdate, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Match).where(Match.id == match_id))
     match = result.scalar_one_or_none()
     if not match:
@@ -139,7 +139,7 @@ async def update_match(match_id: str, body: MatchUpdate, user: CurrentUser = Dep
 
 
 @router.delete("/api/v1/matches/{match_id}", status_code=204)
-async def delete_match(match_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def delete_match(match_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Match).where(Match.id == match_id))
     match = result.scalar_one_or_none()
     if not match:
@@ -149,7 +149,7 @@ async def delete_match(match_id: str, user: CurrentUser = Depends(get_current_us
 
 
 @router.post("/api/v1/matches/{match_id}/acknowledge", response_model=MatchOut)
-async def acknowledge_match(match_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def acknowledge_match(match_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     """Mark as 'acknowledged missing' — no receipt will be provided."""
     result = await db.execute(select(Match).where(Match.id == match_id))
     match = result.scalar_one_or_none()
@@ -163,7 +163,7 @@ async def acknowledge_match(match_id: str, user: CurrentUser = Depends(get_curre
 
 
 @router.post("/api/v1/transactions/{tx_id}/no-receipt", response_model=MatchOut, status_code=201)
-async def mark_no_receipt_needed(tx_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def mark_no_receipt_needed(tx_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     """Mark a transaction as not needing a receipt (e.g. bank fees, internal transfers)."""
     # Remove existing match
     existing = await db.execute(select(Match).where(Match.transaction_id == tx_id))
@@ -205,7 +205,7 @@ async def set_split_receipt(match_id: str, receipt_id: str = Body(..., embed=Tru
 
 
 @router.delete("/api/v1/matches/{match_id}/split-receipt", response_model=MatchOut)
-async def clear_split_receipt(match_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def clear_split_receipt(match_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     """Remove the split second receipt from a match."""
     result = await db.execute(select(Match).where(Match.id == match_id))
     match = result.scalar_one_or_none()

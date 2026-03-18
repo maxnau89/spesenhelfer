@@ -53,3 +53,7 @@ async def _migrate() -> None:
             await conn.execute(sa.text("ALTER TABLE monthly_report ADD COLUMN owner_email TEXT NOT NULL DEFAULT ''"))
         except Exception:
             pass  # column already exists
+        try:
+            await conn.execute(sa.text("ALTER TABLE receipt ADD COLUMN content_hash TEXT"))
+        except Exception:
+            pass  # column already exists

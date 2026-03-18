@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.auth import CurrentUser, get_current_user
+from backend.auth import CurrentUser
 from backend.database import get_db
 from backend.models import Match, MonthlyReport, Transaction
 from backend.services.pdf_assembler import assemble_pdf
@@ -17,7 +17,7 @@ router = APIRouter(tags=["Export"])
 
 
 @router.get("/api/v1/reports/{report_id}/export/pdf")
-async def export_pdf(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def export_pdf(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     report = await _get_report_or_404(report_id, user.email, db)
 
     # Find statement PDF
@@ -54,7 +54,7 @@ async def export_pdf(report_id: str, user: CurrentUser = Depends(get_current_use
 
 
 @router.get("/api/v1/reports/{report_id}/export/status")
-async def export_status(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def export_status(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     report = await _get_report_or_404(report_id, user.email, db)
 
     tx_result = await db.execute(

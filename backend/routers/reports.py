@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.auth import CurrentUser, get_current_user
+from backend.auth import CurrentUser
 from backend.database import get_db
 from backend.models import Match, MonthlyReport, Receipt, Transaction
 from backend.schemas import ReportCreate, ReportDashboard, ReportOut, ReportStats, ReportUpdate, TodoItem, TodoList
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 
 
 @router.get("", response_model=list[ReportOut])
-async def list_reports(user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def list_reports(user: CurrentUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(MonthlyReport)
         .where(MonthlyReport.owner_email == user.email)
@@ -24,7 +24,7 @@ async def list_reports(user: CurrentUser = Depends(get_current_user), db: AsyncS
 
 
 @router.post("", response_model=ReportOut, status_code=201)
-async def create_report(body: ReportCreate, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_report(body: ReportCreate, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(
         select(MonthlyReport).where(
             MonthlyReport.owner_email == user.email,
@@ -42,7 +42,7 @@ async def create_report(body: ReportCreate, user: CurrentUser = Depends(get_curr
 
 
 @router.get("/{report_id}", response_model=ReportDashboard)
-async def get_report(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_report(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     report = await _get_report_or_404(report_id, user.email, db)
 
     tx_result = await db.execute(
@@ -84,7 +84,7 @@ async def get_report(report_id: str, user: CurrentUser = Depends(get_current_use
 
 
 @router.patch("/{report_id}", response_model=ReportOut)
-async def update_report(report_id: str, body: ReportUpdate, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_report(report_id: str, body: ReportUpdate, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     report = await _get_report_or_404(report_id, user.email, db)
     if body.notes is not None:
         report.notes = body.notes
@@ -95,14 +95,14 @@ async def update_report(report_id: str, body: ReportUpdate, user: CurrentUser = 
 
 
 @router.delete("/{report_id}", status_code=204)
-async def delete_report(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def delete_report(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     report = await _get_report_or_404(report_id, user.email, db)
     await db.delete(report)
     await db.commit()
 
 
 @router.get("/{report_id}/todo", response_model=TodoList)
-async def get_todo(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_todo(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     await _get_report_or_404(report_id, user.email, db)
 
     result = await db.execute(

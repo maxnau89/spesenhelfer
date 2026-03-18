@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.auth import CurrentUser, get_current_user
+from backend.auth import CurrentUser
 from backend.database import get_db
 from backend.models import Match, MonthlyReport, Receipt
 from backend.schemas import ReceiptOut
@@ -52,7 +52,7 @@ async def list_gruende():
 async def create_eigenbeleg(
     report_id: str,
     body: EigenbelegRequest,
-    user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    user: CurrentUser, db: AsyncSession = Depends(get_db),
 ):
     # Load report
     result = await db.execute(select(MonthlyReport).where(MonthlyReport.id == report_id))

@@ -1,3 +1,4 @@
+import hashlib
 import io
 import os
 import shutil
@@ -9,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.auth import CurrentUser, get_current_user
+from backend.auth import CurrentUser
 from backend.database import get_db
 from backend.models import MonthlyReport, Receipt
 from backend.schemas import ReceiptOut
@@ -29,11 +30,31 @@ async def upload_receipts(
     upload_dir = os.path.join(settings.upload_dir, f"{report.year}-{report.month:02d}", "receipts")
     os.makedirs(upload_dir, exist_ok=True)
 
+    # Load existing receipts for this report to enable deduplication
+    existing_result = await db.execute(select(Receipt).where(Receipt.report_id == report_id))
+    existing_receipts = existing_result.scalars().all()
+    existing_filenames = {r.filename for r in existing_receipts}
+    existing_hashes = {r.content_hash for r in existing_receipts if r.content_hash}
+
     created: list[Receipt] = []
+    skipped = 0
     for file in files:
         filename = file.filename or "receipt.pdf"
+
+        # Read file bytes once for hashing and writing
+        file_bytes = await file.read()
+        content_hash = hashlib.md5(file_bytes).hexdigest()
+
+        # Skip exact duplicate (same content hash already in this report)
+        if content_hash in existing_hashes:
+            skipped += 1
+            continue
+        # Skip same filename (likely same file re-uploaded)
+        if filename in existing_filenames:
+            skipped += 1
+            continue
+
         file_path = os.path.join(upload_dir, filename)
-        # Handle filename collisions
         base, ext = os.path.splitext(filename)
         counter = 1
         while os.path.exists(file_path):
@@ -41,7 +62,7 @@ async def upload_receipts(
             counter += 1
 
         with open(file_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+            f.write(file_bytes)
 
         extracted = extract_receipt(file_path, filename, openai_api_key=settings.openai_api_key)
 
@@ -49,6 +70,7 @@ async def upload_receipts(
             report_id=report_id,
             filename=filename,
             file_path=file_path,
+            content_hash=content_hash,
             extracted_date=extracted.extracted_date,
             extracted_amount=extracted.extracted_amount,
             extracted_currency=extracted.extracted_currency,
@@ -59,6 +81,8 @@ async def upload_receipts(
         )
         db.add(receipt)
         created.append(receipt)
+        existing_hashes.add(content_hash)
+        existing_filenames.add(filename)
 
     await db.commit()
     for r in created:
@@ -73,7 +97,7 @@ async def upload_receipts(
 
 
 @router.get("/api/v1/reports/{report_id}/receipts", response_model=list[ReceiptOut])
-async def list_receipts(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def list_receipts(report_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     await _get_report_or_404(report_id, user.email, db)
     result = await db.execute(
         select(Receipt).where(Receipt.report_id == report_id)
@@ -84,7 +108,7 @@ async def list_receipts(report_id: str, user: CurrentUser = Depends(get_current_
 
 
 @router.get("/api/v1/receipts/{receipt_id}/thumbnail")
-async def get_receipt_thumbnail(receipt_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_receipt_thumbnail(receipt_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     """Render page 1 of a receipt PDF as PNG (150 dpi)."""
     receipt = await _get_receipt_or_404(receipt_id, db)
     if not os.path.exists(receipt.file_path):
@@ -120,7 +144,7 @@ async def get_receipt_thumbnail(receipt_id: str, user: CurrentUser = Depends(get
 
 
 @router.delete("/api/v1/receipts/{receipt_id}", status_code=204)
-async def delete_receipt(receipt_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def delete_receipt(receipt_id: str, user: CurrentUser, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Receipt).where(Receipt.id == receipt_id))
     receipt = result.scalar_one_or_none()
     if not receipt:

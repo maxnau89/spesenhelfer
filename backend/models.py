@@ -58,6 +58,7 @@ class Receipt(Base):
     extracted_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     extracted_currency: Mapped[str | None] = mapped_column(String, nullable=True)
     extracted_vendor: Mapped[str | None] = mapped_column(String, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     extraction_confidence: Mapped[float] = mapped_column(Float, default=0.0)
     extraction_method: Mapped[str] = mapped_column(String, default="pdfplumber")  # pdfplumber|vision_llm
     raw_extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
