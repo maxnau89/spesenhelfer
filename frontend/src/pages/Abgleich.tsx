@@ -221,8 +221,7 @@ function TxRow({
                   onLightbox={onLightbox}
                 />
               ) : (
-                /* Drop zone for second (split) receipt */
-                tx.needs_receipt && m?.confirmed === false || m?.match_type === "auto" ? null :
+                /* Drop zone for second (split) receipt — always show when first receipt is attached */
                 <div
                   className="w-6 h-11 rounded border-2 border-dashed border-border/50 flex items-center justify-center text-muted-foreground/50 text-[10px] hover:border-blue-300 transition-colors cursor-pointer"
                   title="Zweiten Beleg ablegen (Hin+Rückfahrt)"

@@ -366,25 +366,47 @@ def _extract_vision_llm(file_path: str, filename: str, openai_api_key: str) -> E
     )
 
 
+_DB_TICKET_RE = re.compile(r"db[_\s-]*ticket|deutsche[_\s-]*bahn", re.IGNORECASE)
+
+
+def _is_db_ticket(filename: str) -> bool:
+    return bool(_DB_TICKET_RE.search(Path(filename).stem))
+
+
 def extract_receipt(file_path: str, filename: str, openai_api_key: str = "") -> ExtractedReceipt:
     """
     Hybrid extraction:
-    1. GPT-4o vision (primary when API key available) — handles complex layouts like DB tickets
-    2. pdfplumber fallback — fast regex extraction for simple digital invoices
+    - DB tickets → vision LLM first (pdfplumber misreads their complex multi-price layout)
+    - Everything else → pdfplumber first (fast, reliable for clean digital PDFs)
+    - Vision LLM fallback when pdfplumber gives low confidence or no text layer
     """
-    if openai_api_key:
-        vision_result = _extract_vision_llm(file_path, filename, openai_api_key)
-        if vision_result.extraction_confidence >= 0.4:
-            return vision_result
-
-    # pdfplumber fallback (no API key, or vision returned low confidence)
     import pdfplumber
+
     full_text = ""
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
             full_text += page.extract_text() or ""
+    has_text = len(full_text.strip()) >= 50
 
-    if len(full_text.strip()) >= 50:
-        return _extract_pdfplumber(file_path, filename)
+    # DB tickets: go straight to vision LLM — pdfplumber picks up wrong numbers
+    if openai_api_key and _is_db_ticket(filename):
+        vision_result = _extract_vision_llm(file_path, filename, openai_api_key)
+        if vision_result.extraction_confidence >= 0.4:
+            return vision_result
 
+    # Standard path: pdfplumber
+    if has_text:
+        result = _extract_pdfplumber(file_path, filename)
+        if result.extraction_confidence >= 0.4:
+            return result
+        # Low confidence → try vision
+        if openai_api_key:
+            vision_result = _extract_vision_llm(file_path, filename, openai_api_key)
+            if vision_result.extraction_confidence >= result.extraction_confidence:
+                return vision_result
+        return result
+
+    # No text layer → vision or empty
+    if openai_api_key:
+        return _extract_vision_llm(file_path, filename, openai_api_key)
     return ExtractedReceipt(None, None, None, Path(filename).stem or None, 0.0, "pdfplumber", "")
