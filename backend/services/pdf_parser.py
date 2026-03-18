@@ -19,10 +19,20 @@ class ParsedTransaction:
     amount: float
     currency: str = "EUR"
     raw_text: str = ""
+    needs_receipt: bool = True   # overridden to False for bank fees etc.
 
 
 # Lines containing these words are balance/total rows — skip them
 _SKIP_KEYWORDS = re.compile(r"saldo|gesamt|summe|übertrag|kontostand|limit|verfügbar", re.IGNORECASE)
+
+# Transactions that never require a receipt (bank fees, FX charges, interest)
+_NO_RECEIPT_RE = re.compile(
+    r"auslandsentgelt|fremdwährungsentgelt|währungsumrechnungsentgelt"
+    r"|foreign\s*(transaction)?\s*fee|fx\s*fee"
+    r"|sollzinsen|zinsen|jahresentgelt|kartenentgelt|kontoführungsgebühr"
+    r"|entgelt\b|gebühr\b|cash[\s-]?advance",
+    re.IGNORECASE,
+)
 
 # German date: dd.mm.yyyy
 _DATE_RE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
@@ -69,12 +79,15 @@ def _parse_line(line: str) -> ParsedTransaction | None:
     if not description:
         return None
 
+    needs_receipt = amount < 0 and not _NO_RECEIPT_RE.search(description)
+
     return ParsedTransaction(
         booking_date=booking_date,
         value_date=value_date,
         description=description,
         amount=amount,
         raw_text=line.strip(),
+        needs_receipt=needs_receipt,
     )
 
 

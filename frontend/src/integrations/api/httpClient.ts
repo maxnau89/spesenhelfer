@@ -32,7 +32,7 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
   const res = await fetch(`${BASE}${url}`, init);
   if (res.status === 401 || res.status === 403) {
     localStorage.removeItem(TOKEN_KEY);
-    window.location.href = "/login";
+    window.location.href = `${import.meta.env.BASE_URL}login`;
     throw new Error("Session abgelaufen");
   }
   if (!res.ok) {

@@ -7,7 +7,7 @@ services:
     environment:
       DATABASE_URL: sqlite+aiosqlite:////data/reisekosten.db
       UPLOAD_DIR: /data/uploads
-      CORS_ORIGINS: '["http://188.245.191.188:8010","http://localhost:5173","http://localhost:4173"]'
+      CORS_ORIGINS: '["https://platform.alphatransition.com","http://localhost:5173","http://localhost:4173"]'
       API_HOST: 0.0.0.0
       API_PORT: 8011
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -24,27 +24,7 @@ services:
       retries: 3
       start_period: 20s
     restart: unless-stopped
-    networks:
-      - reisekosten-network
-
-  nginx:
-    image: nginx:alpine
-    container_name: reisekosten-nginx
-    ports:
-      - "8010:80"
-    volumes:
-      - ./frontend/dist:/usr/share/nginx/html:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - api
-    restart: unless-stopped
-    networks:
-      - reisekosten-network
 
 volumes:
   reisekosten_data:
     driver: local
-
-networks:
-  reisekosten-network:
-    driver: bridge

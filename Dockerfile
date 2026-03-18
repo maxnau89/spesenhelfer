@@ -19,7 +19,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 RUN useradd -m appuser
 COPY --chown=appuser:appuser backend ./backend
 
-RUN mkdir -p /data/uploads && chown appuser:appuser /data
+RUN mkdir -p /data/uploads && chown -R appuser:appuser /data
 
 USER appuser
 EXPOSE 8011

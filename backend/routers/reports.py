@@ -5,28 +5,36 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from backend.auth import CurrentUser, get_current_user
 from backend.database import get_db
 from backend.models import Match, MonthlyReport, Receipt, Transaction
-from backend.schemas import ReportCreate, ReportDashboard, ReportOut, ReportStats, TodoItem, TodoList
+from backend.schemas import ReportCreate, ReportDashboard, ReportOut, ReportStats, ReportUpdate, TodoItem, TodoList
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 
 
 @router.get("", response_model=list[ReportOut])
-async def list_reports(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(MonthlyReport).order_by(MonthlyReport.year.desc(), MonthlyReport.month.desc()))
+async def list_reports(user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(MonthlyReport)
+        .where(MonthlyReport.owner_email == user.email)
+        .order_by(MonthlyReport.year.desc(), MonthlyReport.month.desc())
+    )
     return result.scalars().all()
 
 
 @router.post("", response_model=ReportOut, status_code=201)
-async def create_report(body: ReportCreate, db: AsyncSession = Depends(get_db)):
-    # Check duplicate
+async def create_report(body: ReportCreate, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     existing = await db.execute(
-        select(MonthlyReport).where(MonthlyReport.year == body.year, MonthlyReport.month == body.month)
+        select(MonthlyReport).where(
+            MonthlyReport.owner_email == user.email,
+            MonthlyReport.year == body.year,
+            MonthlyReport.month == body.month,
+        )
     )
     if existing.scalar_one_or_none():
         raise HTTPException(400, f"Report for {body.year}-{body.month:02d} already exists")
-    report = MonthlyReport(year=body.year, month=body.month, notes=body.notes)
+    report = MonthlyReport(owner_email=user.email, year=body.year, month=body.month, notes=body.notes)
     db.add(report)
     await db.commit()
     await db.refresh(report)
@@ -34,8 +42,8 @@ async def create_report(body: ReportCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{report_id}", response_model=ReportDashboard)
-async def get_report(report_id: str, db: AsyncSession = Depends(get_db)):
-    report = await _get_report_or_404(report_id, db)
+async def get_report(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    report = await _get_report_or_404(report_id, user.email, db)
 
     tx_result = await db.execute(
         select(Transaction).where(Transaction.report_id == report_id).options(selectinload(Transaction.match))
@@ -56,7 +64,6 @@ async def get_report(report_id: str, db: AsyncSession = Depends(get_db)):
     orphaned = sum(1 for r in receipts if not r.match)
     ready = missing == 0 and len(transactions) > 0
 
-    # Update status
     new_status = "ready" if ready else "draft"
     if report.status != "exported":
         report.status = new_status
@@ -76,16 +83,27 @@ async def get_report(report_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.patch("/{report_id}", response_model=ReportOut)
+async def update_report(report_id: str, body: ReportUpdate, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    report = await _get_report_or_404(report_id, user.email, db)
+    if body.notes is not None:
+        report.notes = body.notes
+    report.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(report)
+    return report
+
+
 @router.delete("/{report_id}", status_code=204)
-async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
-    report = await _get_report_or_404(report_id, db)
+async def delete_report(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    report = await _get_report_or_404(report_id, user.email, db)
     await db.delete(report)
     await db.commit()
 
 
 @router.get("/{report_id}/todo", response_model=TodoList)
-async def get_todo(report_id: str, db: AsyncSession = Depends(get_db)):
-    await _get_report_or_404(report_id, db)
+async def get_todo(report_id: str, user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _get_report_or_404(report_id, user.email, db)
 
     result = await db.execute(
         select(Transaction)
@@ -117,8 +135,10 @@ async def get_todo(report_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
-async def _get_report_or_404(report_id: str, db: AsyncSession) -> MonthlyReport:
-    result = await db.execute(select(MonthlyReport).where(MonthlyReport.id == report_id))
+async def _get_report_or_404(report_id: str, owner_email: str, db: AsyncSession) -> MonthlyReport:
+    result = await db.execute(
+        select(MonthlyReport).where(MonthlyReport.id == report_id, MonthlyReport.owner_email == owner_email)
+    )
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(404, "Report not found")

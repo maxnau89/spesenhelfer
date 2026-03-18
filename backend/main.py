@@ -5,14 +5,15 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.auth import get_current_user
-from backend.database import init_db
-from backend.routers import health, reports, transactions, receipts, matches, export
+from backend.database import init_db, _migrate
+from backend.routers import health, reports, transactions, receipts, matches, export, eigenbeleg
 from backend.settings import settings
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await init_db()
+    await _migrate()
     yield
 
 
@@ -40,6 +41,7 @@ app.include_router(transactions.router, dependencies=_auth)
 app.include_router(receipts.router, dependencies=_auth)
 app.include_router(matches.router, dependencies=_auth)
 app.include_router(export.router, dependencies=_auth)
+app.include_router(eigenbeleg.router, dependencies=_auth)
 
 
 if __name__ == "__main__":

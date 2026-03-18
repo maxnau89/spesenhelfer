@@ -1,7 +1,8 @@
+import json
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # ── Match ──────────────────────────────────────────────────────────────────────
@@ -10,6 +11,7 @@ class MatchOut(BaseModel):
     id: str
     transaction_id: str
     receipt_id: Optional[str]
+    extra_receipt_ids: list[str] = []
     match_type: str
     confidence: float
     confirmed: bool
@@ -18,6 +20,16 @@ class MatchOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("extra_receipt_ids", mode="before")
+    @classmethod
+    def parse_extra_receipt_ids(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return []
+        return v or []
 
 
 class MatchCreate(BaseModel):
@@ -65,6 +77,7 @@ class ReceiptOut(BaseModel):
     filename: str
     extracted_date: Optional[date]
     extracted_amount: Optional[float]
+    extracted_currency: Optional[str]
     extracted_vendor: Optional[str]
     extraction_confidence: float
     extraction_method: str
@@ -102,6 +115,10 @@ class ReportOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ReportUpdate(BaseModel):
+    notes: Optional[str] = None
 
 
 class ReportDashboard(BaseModel):

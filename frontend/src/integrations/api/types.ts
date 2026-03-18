@@ -2,6 +2,7 @@ export interface Match {
   id: string;
   transaction_id: string;
   receipt_id: string | null;
+  extra_receipt_ids: string[];
   match_type: "auto" | "manual" | "acknowledged_missing" | "no_receipt_needed";
   confidence: number;
   confirmed: boolean;
@@ -28,6 +29,7 @@ export interface Receipt {
   filename: string;
   extracted_date: string | null;
   extracted_amount: number | null;
+  extracted_currency: string | null;
   extracted_vendor: string | null;
   extraction_confidence: number;
   extraction_method: "pdfplumber" | "vision_llm";

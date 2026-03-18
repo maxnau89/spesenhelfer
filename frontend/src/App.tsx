@@ -3,10 +3,7 @@ import { BrowserRouter, Route, Routes, Navigate, useLocation, useSearchParams } 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
-import { Dashboard } from "@/pages/Dashboard";
-import { Upload } from "@/pages/Upload";
-import { Matching } from "@/pages/Matching";
-import { Export } from "@/pages/Export";
+import { Abgleich } from "@/pages/Abgleich";
 import { Login } from "@/pages/Login";
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
@@ -31,10 +28,8 @@ function AppContent() {
   return (
     <Layout reportId={reportId ?? undefined} onReportChange={handleReportChange}>
       <Routes>
-        <Route path="/" element={<Dashboard reportId={reportId} />} />
-        <Route path="/upload" element={<Upload reportId={reportId} />} />
-        <Route path="/matching" element={<Matching reportId={reportId} />} />
-        <Route path="/export" element={<Export reportId={reportId} />} />
+        <Route path="/" element={<Abgleich reportId={reportId} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
   );
@@ -44,7 +39,7 @@ export default function App() {
   return (
     <QueryClientProvider client={qc}>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route

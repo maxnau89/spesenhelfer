@@ -2,10 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { loginRequest, msalInstance, msalReady } from "@/lib/msalConfig";
 
 export function Login() {
-  const { login, setTokenFromMicrosoft } = useAuth();
+  const { login, loginMicrosoft } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as any)?.from?.pathname || "/";
@@ -34,24 +33,10 @@ export function Login() {
     setMsLoading(true);
     setError(null);
     try {
-      await msalReady;
-      // Clear stale MSAL interaction state
-      for (const key of Object.keys(sessionStorage)) {
-        if (key.includes("msal") && (key.includes("interaction") || key.includes("request"))) {
-          sessionStorage.removeItem(key);
-        }
-      }
-      const result = await msalInstance.loginPopup({
-        ...loginRequest,
-        redirectUri: `${window.location.origin}/auth-popup.html`,
-      });
-      if (!result?.idToken) throw new Error("Kein ID-Token von Microsoft");
-      await setTokenFromMicrosoft(result.idToken);
+      await loginMicrosoft();
       navigate(from, { replace: true });
     } catch (err: any) {
-      if (err?.errorCode === "user_cancelled" || err?.message?.includes("user_cancelled")) return;
       setError(err.message || "Microsoft-Login fehlgeschlagen");
-    } finally {
       setMsLoading(false);
     }
   };
