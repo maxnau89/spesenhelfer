@@ -23,8 +23,38 @@ interface LayoutProps {
   onReportChange?: (id: string) => void;
 }
 
+function NewReportDialog({ onConfirm, onClose }: { onConfirm: (year: number, month: number) => void; onClose: () => void }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-xl w-72 p-5" onClick={e => e.stopPropagation()}>
+        <h2 className="font-semibold text-sm mb-4">Neue Abrechnung</h2>
+        <div className="flex gap-2 mb-4">
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground block mb-1">Monat</label>
+            <select value={month} onChange={e => setMonth(+e.target.value)} className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background">
+              {MONTHS_DE.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+            </select>
+          </div>
+          <div className="w-20">
+            <label className="text-xs text-muted-foreground block mb-1">Jahr</label>
+            <input type="number" value={year} onChange={e => setYear(+e.target.value)} className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background" min={2020} max={2099} />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-1.5 text-xs border border-border rounded-md hover:bg-muted">Abbrechen</button>
+          <button onClick={() => onConfirm(year, month)} className="flex-1 py-1.5 text-xs bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90">Erstellen</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Layout({ children, reportId, onReportChange }: LayoutProps) {
   const [creating, setCreating] = useState(false);
+  const [showNewDialog, setShowNewDialog] = useState(false);
   const { email, logout } = useAuth();
   const queryClient = useQueryClient();
 
@@ -33,11 +63,11 @@ export function Layout({ children, reportId, onReportChange }: LayoutProps) {
     queryFn: getReports,
   });
 
-  const handleCreate = async () => {
-    const now = new Date();
+  const handleCreate = async (year: number, month: number) => {
+    setShowNewDialog(false);
     try {
       setCreating(true);
-      const r = await createReport(now.getFullYear(), now.getMonth() + 1);
+      const r = await createReport(year, month);
       await refetch();
       onReportChange?.(r.id);
     } catch (e: any) {
@@ -88,12 +118,13 @@ export function Layout({ children, reportId, onReportChange }: LayoutProps) {
             ))}
           </div>
           <button
-            onClick={handleCreate}
+            onClick={() => setShowNewDialog(true)}
             disabled={creating}
             className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md text-left transition-colors"
           >
             {creating ? "…" : "+ Neue Abrechnung"}
           </button>
+          {showNewDialog && <NewReportDialog onConfirm={handleCreate} onClose={() => setShowNewDialog(false)} />}
         </div>
 
         {/* User / logout */}
