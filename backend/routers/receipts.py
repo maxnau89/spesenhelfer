@@ -23,6 +23,7 @@ router = APIRouter(tags=["Receipts"])
 @router.post("/api/v1/reports/{report_id}/receipts", response_model=list[ReceiptOut], status_code=201)
 async def upload_receipts(
     report_id: str,
+    user: CurrentUser,
     files: List[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
 ):
