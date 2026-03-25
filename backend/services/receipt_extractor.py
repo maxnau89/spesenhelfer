@@ -394,19 +394,19 @@ def extract_receipt(file_path: str, filename: str, openai_api_key: str = "") -> 
         if vision_result.extraction_confidence >= 0.4:
             return vision_result
 
-    # Standard path: pdfplumber
-    if has_text:
-        result = _extract_pdfplumber(file_path, filename)
-        if result.extraction_confidence >= 0.4:
-            return result
-        # Low confidence → try vision
-        if openai_api_key:
-            vision_result = _extract_vision_llm(file_path, filename, openai_api_key)
-            if vision_result.extraction_confidence >= result.extraction_confidence:
-                return vision_result
-        return result
-
-    # No text layer → vision or empty
+    # Vision LLM available: always use it — pdfplumber can misread amounts/vendors
+    # even at 1.0 confidence (e.g. reads recipient as vendor, picks up a fee not total).
+    # pdfplumber runs first as fast fallback; vision is preferred when key is present.
     if openai_api_key:
-        return _extract_vision_llm(file_path, filename, openai_api_key)
+        vision_result = _extract_vision_llm(file_path, filename, openai_api_key)
+        if vision_result.extraction_confidence >= 0.4:
+            return vision_result
+        # Vision failed — fall back to pdfplumber if there's text
+        if has_text:
+            return _extract_pdfplumber(file_path, filename)
+        return vision_result
+
+    # No API key: pdfplumber only
+    if has_text:
+        return _extract_pdfplumber(file_path, filename)
     return ExtractedReceipt(None, None, None, Path(filename).stem or None, 0.0, "pdfplumber", "")
