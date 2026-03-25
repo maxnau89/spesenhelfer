@@ -49,7 +49,7 @@ async def export_pdf(report_id: str, user: CurrentUser, db: AsyncSession = Depen
     MONTHS_DE = ["Januar","Februar","März","April","Mai","Juni",
                  "Juli","August","September","Oktober","November","Dezember"]
     month_name = MONTHS_DE[report.month - 1]
-    filename = f"KKA Maximilian Naumow {month_name} {report.year}.pdf"
+    filename = f"KKA {user.display_name} {month_name} {report.year}.pdf"
     return FileResponse(output_path, media_type="application/pdf", filename=filename)
 
 

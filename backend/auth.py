@@ -22,6 +22,16 @@ class TokenUser(BaseModel):
     email: str
     user_id: str | None = None
     role: str = "user"
+    name: str | None = None  # from JWT if present
+
+    @property
+    def display_name(self) -> str:
+        """Best-effort full name: JWT name field or email-derived."""
+        if self.name:
+            return self.name
+        local = self.email.split("@")[0]
+        parts = local.replace("_", ".").split(".")
+        return " ".join(p.capitalize() for p in parts)
 
 
 def _decode(token: str) -> dict | None:
@@ -53,6 +63,7 @@ async def get_current_user(
         email=email,
         user_id=payload.get("user_id"),
         role=payload.get("role", "user"),
+        name=payload.get("name"),
     )
 
 
